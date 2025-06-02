@@ -1,0 +1,105 @@
+---
+- name: Deploy Dockerized MySQL and Webapp on EC2
+  hosts: ec2
+  become: yes
+  vars:
+    aws_region: us-east-1
+    aws_account_id: 164340264957
+    mysql_root_password: yourpassword
+    docker_network: clo835-net
+    webapp_image: "{{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/webapp:latest"
+    mysql_image: "{{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/mysql:latest"
+  
+  collections:
+  - amazon.aws
+  - community.docker
+
+  tasks:
+    - name: Install Docker
+      yum:
+        name: docker
+        state: present
+
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ec2-user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
+
+    - name: Log in to AWS ECR
+      shell: |
+        aws ecr get-login-password --region {{ aws_region }} | \
+        docker login --username AWS --password-stdin {{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com
+      register: ecr_login
+      changed_when: "'Login Succeeded' in ecr_login.stdout"
+
+    - name: Create Docker bridge network
+      community.docker.docker_network:
+        name: "{{ docker_network }}"
+        state: present
+
+    - name: Pull MySQL image from ECR
+      community.docker.docker_image:
+        name: "{{ mysql_image }}"
+        source: pull
+
+    - name: Run MySQL container
+      community.docker.docker_container:
+        name: mysql-db
+        image: "{{ mysql_image }}"
+        state: started
+        restart_policy: always
+        env:
+          MYSQL_ROOT_PASSWORD: "{{ mysql_root_password }}"
+        networks:
+          - name: "{{ docker_network }}"
+
+    - name: Pull Webapp image from ECR
+      community.docker.docker_image:
+        name: "{{ webapp_image }}"
+        source: pull
+
+    - name: Run Blue webapp container
+      community.docker.docker_container:
+        name: blue
+        image: "{{ webapp_image }}"
+        state: started
+        restart_policy: always
+        env:
+          BACKGROUND_COLOR: blue
+        networks:
+          - name: "{{ docker_network }}"
+        published_ports:
+          - "8081:8080"
+
+    - name: Run Pink webapp container
+      community.docker.docker_container:
+        name: pink
+        image: "{{ webapp_image }}"
+        state: started
+        restart_policy: always
+        env:
+          BACKGROUND_COLOR: pink
+        networks:
+          - name: "{{ docker_network }}"
+        published_ports:
+          - "8082:8080"
+
+    - name: Run Lime webapp container
+      community.docker.docker_container:
+        name: lime
+        image: "{{ webapp_image }}"
+        state: started
+        restart_policy: always
+        env:
+          BACKGROUND_COLOR: lime
+        networks:
+          - name: "{{ docker_network }}"
+        published_ports:
+          - "8083:8080"
