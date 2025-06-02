@@ -4,7 +4,7 @@
   become: yes
   vars:
     aws_region: us-east-1
-    aws_account_id: 164340264957
+    aws_account_id: ${{ secrets.ACCOUNT_ID }}
     mysql_root_password: yourpassword
     docker_network: clo835-net
     webapp_image: "{{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/webapp:latest"
