@@ -4,7 +4,7 @@
   become: yes
   vars:
     aws_region: us-east-1
-    aws_account_id: ${{ secrets.ACCOUNT_ID }}
+    aws_account_id: 164340264957
     mysql_root_password: yourpassword
     docker_network: clo835-net
     webapp_image: "{{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/webapp:latest"
@@ -31,12 +31,25 @@
         name: ec2-user
         groups: docker
         append: yes
+  
+    - name: Install Flask, PyMySQL, and Cryptography
+      ansible.builtin.pip:
+        name:
+          - flask==2.0.3
+          - pymysql==1.0.2
+          - cryptography==38.0.1
+          - requests
+          - urllib3==1.26.18
+        state: present
+      become: yes
 
     - name: Log in to AWS ECR
       shell: |
         aws ecr get-login-password --region {{ aws_region }} | \
         docker login --username AWS --password-stdin {{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com
       register: ecr_login
+      become: yes
+      become_user: ec2-user 
       changed_when: "'Login Succeeded' in ecr_login.stdout"
 
     - name: Create Docker bridge network
